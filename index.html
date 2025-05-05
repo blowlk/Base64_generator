@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Base64 File Encoder</title>
+  <style>
+    :root {
+      --bg-light: #f2f4f8;
+      --bg-dark: #1e1e1e;
+      --text-light: #222;
+      --text-dark: #eee;
+      --card-light: #fff;
+      --card-dark: #2b2b2b;
+      --accent: #4CAF50;
+    }
+
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: var(--bg-light);
+      color: var(--text-light);
+      margin: 0;
+      padding: 2rem;
+      transition: all 0.3s ease;
+    }
+
+    body.dark {
+      background: var(--bg-dark);
+      color: var(--text-dark);
+    }
+
+    .container {
+      max-width: 800px;
+      margin: auto;
+      background: var(--card-light);
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      padding: 2rem;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    body.dark .container {
+      background: var(--card-dark);
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+    }
+
+    h1 {
+      text-align: center;
+      color: inherit;
+    }
+
+    input[type="file"] {
+      display: block;
+      margin: 1rem auto;
+    }
+
+    button {
+      display: inline-block;
+      margin: 1rem auto;
+      padding: 0.7rem 1.5rem;
+      background-color: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background-color: #388e3c;
+    }
+
+    #controls {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    textarea {
+      width: 100%;
+      height: 300px;
+      margin-top: 1rem;
+      font-family: monospace;
+      font-size: 0.85rem;
+      padding: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: #f9f9f9;
+      resize: vertical;
+      color: #333;
+    }
+
+    body.dark textarea {
+      background: #333;
+      color: #eee;
+      border-color: #555;
+    }
+
+    .theme-toggle {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 1.2rem;
+    }
+
+    .theme-toggle input {
+      appearance: none;
+      width: 40px;
+      height: 20px;
+      background: #ccc;
+      border-radius: 20px;
+      position: relative;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .theme-toggle input::before {
+      content: "";
+      width: 16px;
+      height: 16px;
+      background: white;
+      border-radius: 50%;
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      transition: 0.3s;
+    }
+
+    .theme-toggle input:checked::before {
+      left: 22px;
+    }
+
+    .download-btn {
+      background-color: #2196F3;
+    }
+    .download-btn:hover {
+      background-color: #1976D2;
+    }
+
+    #dropZone {
+      border: 2px dashed #aaa;
+      padding: 1rem;
+      margin-top: 1rem;
+      text-align: center;
+      color: #777;
+      border-radius: 8px;
+    }
+    #dropZone.dragover {
+      background-color: #eee;
+      border-color: #333;
+    }
+    body.dark #dropZone {
+      border-color: #555;
+      background-color: #2a2a2a;
+      color: #bbb;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="theme-toggle">
+      ☀️
+      <input type="checkbox" id="darkToggle" onchange="toggleDarkMode()">
+      🌙
+    </div>
+    <h1>Base64 File Encoder</h1>
+    <input type="file" id="fileInput" />
+    <div id="dropZone">Drag and drop a file here</div>
+    <div id="controls">
+      <button onclick="convertToBase64()">Convert to Base64</button>
+      <button onclick="copyToClipboard()">Copy to Clipboard</button>
+      <button onclick="downloadAsText()" class="download-btn">Download as .txt</button>
+    </div>
+    <textarea id="output" placeholder="Base64 result will appear here..."></textarea>
+  </div>
+
+  <script>
+    function convertToBase64() {
+      const fileInput = document.getElementById('fileInput');
+      const output = document.getElementById('output');
+      const file = fileInput.files[0];
+
+      if (!file) {
+        alert("Please choose a file.");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const base64String = e.target.result.split(",")[1];
+        output.value = base64String;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function copyToClipboard() {
+      const output = document.getElementById("output");
+      output.select();
+      document.execCommand("copy");
+      alert("Base64 copied to clipboard!");
+    }
+
+    function downloadAsText() {
+      const output = document.getElementById("output").value;
+      const blob = new Blob([output], { type: "text/plain;charset=utf-8" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "base64.txt";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function toggleDarkMode() {
+      document.body.classList.toggle("dark");
+    }
+
+    // Auto-detect dark mode from system
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.body.classList.add("dark");
+      document.getElementById("darkToggle").checked = true;
+    }
+
+    const dropZone = document.getElementById("dropZone");
+    dropZone.addEventListener("dragover", function (e) {
+      e.preventDefault();
+      dropZone.classList.add("dragover");
+    });
+
+    dropZone.addEventListener("dragleave", function () {
+      dropZone.classList.remove("dragover");
+    });
+
+    dropZone.addEventListener("drop", function (e) {
+      e.preventDefault();
+      dropZone.classList.remove("dragover");
+
+      const files = e.dataTransfer.files;
+      if (files.length) {
+        document.getElementById("fileInput").files = files;
+        convertToBase64();
+      }
+    });
+  </script>
+</body>
+</html>
