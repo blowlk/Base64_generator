@@ -1,252 +1,367 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Base64 File Encoder</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Base64 Encoder / Decoder</title>
   <style>
-    :root {
-      --bg-light: #f2f4f8;
-      --bg-dark: #1e1e1e;
-      --text-light: #222;
-      --text-dark: #eee;
-      --card-light: #fff;
-      --card-dark: #2b2b2b;
-      --accent: #4CAF50;
-    }
-
-    body {
-      font-family: "Segoe UI", sans-serif;
-      background: var(--bg-light);
-      color: var(--text-light);
-      margin: 0;
-      padding: 2rem;
-      transition: all 0.3s ease;
-    }
-
-    body.dark {
-      background: var(--bg-dark);
-      color: var(--text-dark);
-    }
-
-    .container {
-      max-width: 800px;
-      margin: auto;
-      background: var(--card-light);
-      border-radius: 12px;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-      padding: 2rem;
-      transition: all 0.3s ease;
-      position: relative;
-    }
-
-    body.dark .container {
-      background: var(--card-dark);
-      box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
-    }
-
-    h1 {
-      text-align: center;
-      color: inherit;
-    }
-
-    input[type="file"] {
-      display: block;
-      margin: 1rem auto;
-    }
-
-    button {
-      display: inline-block;
-      margin: 1rem auto;
-      padding: 0.7rem 1.5rem;
-      background-color: var(--accent);
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 1rem;
-      transition: background 0.3s;
-    }
-
-    button:hover {
-      background-color: #388e3c;
-    }
-
-    #controls {
-      display: flex;
-      justify-content: center;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-
-    textarea {
-      width: 100%;
-      height: 300px;
-      margin-top: 1rem;
-      font-family: monospace;
-      font-size: 0.85rem;
-      padding: 1rem;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      background: #f9f9f9;
-      resize: vertical;
-      color: #333;
-    }
-
-    body.dark textarea {
-      background: #333;
-      color: #eee;
-      border-color: #555;
-    }
-
-    .theme-toggle {
-      position: absolute;
-      top: 1rem;
-      right: 1rem;
-      display: flex;
-      align-items: center;
-      gap: 0.25rem;
-      font-size: 1.2rem;
-    }
-
-    .theme-toggle input {
-      appearance: none;
-      width: 40px;
-      height: 20px;
-      background: #ccc;
-      border-radius: 20px;
-      position: relative;
-      outline: none;
-      cursor: pointer;
-    }
-
-    .theme-toggle input::before {
-      content: "";
-      width: 16px;
-      height: 16px;
-      background: white;
-      border-radius: 50%;
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      transition: 0.3s;
-    }
-
-    .theme-toggle input:checked::before {
-      left: 22px;
-    }
-
-    .download-btn {
-      background-color: #2196F3;
-    }
-    .download-btn:hover {
-      background-color: #1976D2;
-    }
-
-    #dropZone {
-      border: 2px dashed #aaa;
-      padding: 1rem;
-      margin-top: 1rem;
-      text-align: center;
-      color: #777;
-      border-radius: 8px;
-    }
-    #dropZone.dragover {
-      background-color: #eee;
-      border-color: #333;
-    }
-    body.dark #dropZone {
-      border-color: #555;
-      background-color: #2a2a2a;
-      color: #bbb;
-    }
+    :root { --bg-light:#f2f4f8; --bg-dark:#1e1e1e; --text-light:#222; --text-dark:#eee; --card-light:#fff; --card-dark:#2b2b2b; --accent:#4CAF50; }
+    body { font-family:"Segoe UI",sans-serif; background:var(--bg-light); color:var(--text-light); margin:0; padding:2rem; transition:.3s all; }
+    body.dark { background:var(--bg-dark); color:var(--text-dark); }
+    .container { max-width:980px; margin:auto; background:var(--card-light); border-radius:12px; padding:2rem; box-shadow:0 4px 10px rgba(0,0,0,.1); transition:.3s all; position:relative; }
+    body.dark .container { background:var(--card-dark); box-shadow:0 0 10px rgba(255,255,255,.1); }
+    h1 { text-align:center; margin-top:0; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+    @media (max-width:900px){ .row{grid-template-columns:1fr;} }
+    .card { display:flex; flex-direction:column; }
+    .card label { font-weight:600; margin-bottom:.5rem; }
+    textarea { width:100%; min-height:260px; font-family:monospace; font-size:.9rem; padding:1rem; border:1px solid #ccc; border-radius:8px; background:#f9f9f9; color:#333; resize:vertical; }
+    body.dark textarea { background:#333; color:#eee; border-color:#555; }
+    input[type="file"] { display:block; margin:.5rem 0 0; }
+    .hint { font-size:.85rem; opacity:.8; margin-top:.25rem; }
+    #controls { display:flex; flex-wrap:wrap; justify-content:center; gap:.75rem; margin-top:1rem; }
+    button { padding:.7rem 1.2rem; background:var(--accent); color:#fff; border:none; border-radius:8px; cursor:pointer; transition:.2s background; }
+    button:hover { background:#388e3c; }
+    .download-btn { background:#2196F3; } .download-btn:hover { background:#1976D2; }
+    #dropZone { border:2px dashed #aaa; padding:1rem; margin-top:1rem; text-align:center; color:#777; border-radius:8px; }
+    #dropZone.dragover { background:#eee; border-color:#333; }
+    body.dark #dropZone { border-color:#555; background:#2a2a2a; color:#bbb; }
+    .theme-toggle { position:absolute; top:1rem; right:1rem; display:flex; align-items:center; gap:.25rem; font-size:1.2rem; }
+    .theme-toggle input { appearance:none; width:40px; height:20px; background:#ccc; border-radius:20px; position:relative; cursor:pointer; }
+    .theme-toggle input::before { content:""; width:16px; height:16px; background:#fff; border-radius:50%; position:absolute; top:2px; left:2px; transition:.3s; }
+    .theme-toggle input:checked::before { left:22px; }
+    .radio-line { display:flex; align-items:center; gap:1rem; justify-content:center; margin-top:.5rem; flex-wrap:wrap; }
+    .subtle { opacity:.7; font-size:.85rem; }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="theme-toggle">
-      ☀️
-      <input type="checkbox" id="darkToggle" onchange="toggleDarkMode()">
+    <div class="theme-toggle">☀️
+      <input type="checkbox" id="darkToggle" />
       🌙
     </div>
-    <h1>Base64 File Encoder</h1>
+
+    <h1>Base64 Encoder / Decoder</h1>
+
+    <div class="row">
+      <div class="card">
+        <label for="base64Area">Base64</label>
+        <textarea id="base64Area" placeholder="Paste Base64 here (optionally data URL: data:...;base64,XXXX)"></textarea>
+        <div class="hint">Use “Convert from Base64” to fill the Decoded Text area.</div>
+      </div>
+      <div class="card">
+        <label for="decodedArea">Decoded Text</label>
+        <textarea id="decodedArea" placeholder="Decoded text will appear here. You can also type here and click &quot;Convert to Base64&quot;."></textarea>
+        <div class="hint">If you select a file, “Convert to Base64” uses the file instead of this text.</div>
+      </div>
+    </div>
+
     <input type="file" id="fileInput" />
-    <div id="dropZone">Drag and drop a file here</div>
+    <div class="subtle">Tip: to decode from a file that contains Base64 text, attach it and click “Convert from Base64”.</div>
+    <div id="dropZone">Drag & drop a file here</div>
+
     <div id="controls">
       <button onclick="convertToBase64()">Convert to Base64</button>
-      <button onclick="copyToClipboard()">Copy to Clipboard</button>
-      <button onclick="downloadAsText()" class="download-btn">Download as .txt</button>
+      <button onclick="convertFromBase64()">Convert from Base64</button>
+      <button onclick="copySelected()">Copy Selected</button>
+      <button class="download-btn" onclick="downloadSelected()">Download Selected Area</button>
     </div>
-    <textarea id="output" placeholder="Base64 result will appear here..."></textarea>
+
+    <div class="radio-line">
+      <span>Selected area:</span>
+      <label><input type="radio" name="targetArea" value="base64" checked> Base64 area</label>
+      <label><input type="radio" name="targetArea" value="decoded"> Decoded Text area</label>
+    </div>
   </div>
 
   <script>
-    function convertToBase64() {
-      const fileInput = document.getElementById('fileInput');
-      const output = document.getElementById('output');
-      const file = fileInput.files[0];
+    // ----- Theme -----
+    const darkToggle = document.getElementById("darkToggle");
+    const preferDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (preferDark) darkToggle.checked = true;
+    applyTheme();
+    darkToggle.addEventListener('change', applyTheme);
+    function applyTheme(){ document.body.classList.toggle("dark", darkToggle.checked); }
 
-      if (!file) {
-        alert("Please choose a file.");
+    // ----- Elements -----
+    const fileInput   = document.getElementById("fileInput");
+    const base64Area  = document.getElementById("base64Area");
+    const decodedArea = document.getElementById("decodedArea");
+    const dropZone    = document.getElementById("dropZone");
+
+    // ----- Drag & Drop -----
+    dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("dragover"); });
+    dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+    dropZone.addEventListener("drop", e => {
+      e.preventDefault();
+      dropZone.classList.remove("dragover");
+      if (e.dataTransfer.files?.length) { fileInput.files = e.dataTransfer.files; }
+    });
+
+    // ----- Core utils -----
+    function uint8ToBase64(uint8) {
+      let bin = "";
+      const chunk = 0x8000;
+      for (let i = 0; i < uint8.length; i += chunk) {
+        bin += String.fromCharCode.apply(null, uint8.subarray(i, i + chunk));
+      }
+      return btoa(bin);
+    }
+
+    function base64Clean(s) {
+      // Accept URL-safe base64, strip whitespace/newlines
+      return s.trim().replace(/[\r\n\s]/g, "").replace(/-/g, "+").replace(/_/g, "/");
+    }
+
+    function base64ToUint8(b64) {
+      const clean = base64Clean(b64);
+      const binStr = atob(clean);
+      const len = binStr.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) bytes[i] = binStr.charCodeAt(i);
+      return bytes;
+    }
+
+    function tryDecodeUtf8(bytes) {
+      try { return new TextDecoder("utf-8", { fatal:false }).decode(bytes); }
+      catch { return null; }
+    }
+
+    function sniffDataUrl(value) {
+      // Accept plain base64 or data URL; return {mime, name, base64}
+      const v = value.trim();
+      const m = v.match(/^data:([^;,]+)?(?:;name=([^;,]+))?;base64,(.+)$/i);
+      if (m) return { mime: m[1] || "application/octet-stream", name: m[2] || "file", base64: m[3] };
+      return { mime: "application/octet-stream", name: "file", base64: v };
+    }
+
+    // ---- Magic number MIME/extension sniff ----
+    function bytesIncludesAscii(bytes, asciiStr) {
+    // Search for an ASCII substring anywhere in the byte array
+    const pat = new TextEncoder().encode(asciiStr);
+    if (pat.length === 0 || bytes.length < pat.length) return false;
+    // naive scan (fast enough for typical files in-browser)
+    outer: for (let i = 0; i <= bytes.length - pat.length; i++) {
+      for (let j = 0; j < pat.length; j++) {
+        if (bytes[i + j] !== pat[j]) continue outer;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  // Replace your existing guessFileInfo with this extended one:
+  function guessFileInfo(bytes, fallbackName = "decoded_file") {
+    const head = bytes.subarray(0, Math.min(bytes.length, 4096));
+    const asStr = (n, off=0)=>String.fromCharCode(...head.subarray(off, off+n));
+    const hex = (...h)=>h.every((v,i)=>head[i]===v);
+
+    // Default
+    let mime = "application/octet-stream";
+    let ext  = "bin";
+
+    // --- Binary signatures (magic numbers) ---
+    if (hex(0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A)) { mime="image/png"; ext="png"; }
+    else if (hex(0xFF,0xD8,0xFF)) { mime="image/jpeg"; ext="jpg"; }
+    else if (asStr(6)==="GIF87a" || asStr(6)==="GIF89a") { mime="image/gif"; ext="gif"; }
+    else if (asStr(4)==="%PDF") { mime="application/pdf"; ext="pdf"; }
+    else if (hex(0x50,0x4B,0x03,0x04) || hex(0x50,0x4B,0x05,0x06) || hex(0x50,0x4B,0x07,0x08)) {
+      // ZIP container (could also be OOXML, APK, JAR, etc.)
+      // Try to identify Office Open XML by scanning for known entries
+      const looksLikeOOXML = bytesIncludesAscii(bytes, "[Content_Types].xml");
+      if (looksLikeOOXML) {
+        if (bytesIncludesAscii(bytes, "word/"))      { mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"; ext="docx"; }
+        else if (bytesIncludesAscii(bytes, "xl/"))   { mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";      ext="xlsx"; }
+        else if (bytesIncludesAscii(bytes, "ppt/"))  { mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"; ext="pptx"; }
+        else { mime="application/zip"; ext="zip"; }
+      } else {
+        mime="application/zip"; ext="zip";
+      }
+    }
+    else if (hex(0x52,0x61,0x72,0x21,0x1A,0x07,0x00)) { mime="application/vnd.rar"; ext="rar"; }
+    else if (hex(0x37,0x7A,0xBC,0xAF,0x27,0x1C)) { mime="application/x-7z-compressed"; ext="7z"; }
+    else if (hex(0x1F,0x8B)) { mime="application/gzip"; ext="gz"; } // gzip
+    else if (hex(0x42,0x5A,0x68)) { mime="application/x-bzip2"; ext="bz2"; } // bzip2
+    else if (hex(0xFD,0x37,0x7A,0x58,0x5A,0x00)) { mime="application/x-xz"; ext="xz"; } // xz
+    else if (asStr(5,257)==="ustar") { mime="application/x-tar"; ext="tar"; } // tar (ustar at offset 257)
+    else if (asStr(4)==="OggS") { mime="application/ogg"; ext="ogg"; }
+    else if (asStr(4)==="RIFF" && asStr(4,8)==="WAVE") { mime="audio/wav"; ext="wav"; }
+    else if (asStr(3)==="ID3" || (head[0]===0xFF && (head[1]&0xE0)===0xE0)) { mime="audio/mpeg"; ext="mp3"; }
+    else if (asStr(4,4)==="ftyp") { mime="video/mp4"; ext="mp4"; } // most mp4/quicktime variants
+    else if (hex(0x1A,0x45,0xDF,0xA3)) { mime="video/webm"; ext="webm"; }
+    else {
+      // --- ASN.1 DER family (very heuristic): X.509 cert/key vs PKCS#12 ---
+      // Many DER files begin with 0x30 0x82 ...
+      // Try to spot PKCS#12 by searching for characteristic attribute names (UTF-16LE often appears)
+      const looksDer = head[0] === 0x30 && head[1] >= 0x80;
+      if (looksDer) {
+        // Check for 'friendlyName' or 'Microsoft CSP' as UTF-16LE markers
+        const fnLE = new TextEncoder().encode("f\0r\0i\0e\0n\0d\0l\0y\0N\0a\0m\0e\0");
+        const msLE = new TextEncoder().encode("M\0i\0c\0r\0o\0s\0o\0f\0t\0");
+        const containsFriendly = bytesIncludesAscii(bytes, "friendlyName") || includesSubarray(bytes, fnLE);
+        const containsMS = bytesIncludesAscii(bytes, "Microsoft") || includesSubarray(bytes, msLE);
+        if (containsFriendly || containsMS) {
+          mime = "application/x-pkcs12"; ext = "p12"; // .pfx also common
+        } else {
+          // Fall back to generic DER (certificate/key/PKCS# structures)
+          mime = "application/x-x509-ca-cert"; ext = "der";
+        }
+      } else {
+        // --- Text heuristics ---
+        const asText = tryDecodeUtf8(bytes);
+        if (asText) {
+          const sample = asText.slice(0, 4096).trim();
+          if (sample.startsWith("-----BEGIN ")) {
+            // PEM containers
+            if (sample.includes("BEGIN CERTIFICATE")) { mime="application/x-pem-file"; ext="pem"; }
+            else if (sample.includes("BEGIN PRIVATE KEY") || sample.includes("BEGIN RSA PRIVATE KEY")) { mime="application/x-pem-file"; ext="pem"; }
+            else if (sample.includes("BEGIN PKCS12")) { mime="application/x-pkcs12"; ext="p12"; }
+            else { mime="application/x-pem-file"; ext="pem"; }
+          } else if (sample.startsWith("{") || sample.startsWith("[")) { mime="application/json"; ext="json"; }
+          else if (sample.startsWith("<?xml")) { mime="application/xml"; ext="xml"; }
+          else {
+            const firstLine = sample.split(/\r?\n/)[0] || "";
+            if (/,/.test(firstLine) && sample.includes("\n")) { mime="text/csv"; ext="csv"; }
+            else { mime="text/plain"; ext="txt"; }
+          }
+        }
+      }
+    }
+
+    const name = `${fallbackName}.${ext}`;
+    return { mime, ext, name };
+
+    // tiny helper to find any byte sequence (used above for UTF-16LE markers)
+    function includesSubarray(hay, needle) {
+      if (!needle || needle.length === 0 || hay.length < needle.length) return false;
+      outer: for (let i = 0; i <= hay.length - needle.length; i++) {
+        for (let j = 0; j < needle.length; j++) {
+          if (hay[i + j] !== needle[j]) continue outer;
+        }
+        return true;
+      }
+      return false;
+    }
+  }
+
+    // ----- Actions -----
+    async function convertToBase64() {
+      // If a file is chosen -> encode file; else encode text from decodedArea.
+      const file = fileInput.files?.[0];
+
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          const dataUrl = e.target.result; // data:<mime>;base64,XXXX
+          const base64 = String(dataUrl).split(",")[1] || "";
+          base64Area.value = base64;
+        };
+        reader.readAsDataURL(file);
         return;
       }
 
-      const reader = new FileReader();
-      reader.onload = function (e) {
-        const base64String = e.target.result.split(",")[1];
-        output.value = base64String;
-      };
-      reader.readAsDataURL(file);
+      const text = decodedArea.value;
+      if (!text) { alert("Type in the Decoded Text area or select a file."); return; }
+      const bytes = new TextEncoder().encode(text);
+      base64Area.value = uint8ToBase64(bytes);
     }
 
-    function copyToClipboard() {
-      const output = document.getElementById("output");
-      output.select();
-      document.execCommand("copy");
-      alert("Base64 copied to clipboard!");
+    async function convertFromBase64() {
+      // If a file is attached, treat it as a Base64 text source:
+      const file = fileInput.files?.[0];
+      if (file && !base64Area.value.trim()) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          base64Area.value = String(e.target.result || "").trim();
+          // recurse into decoding after load
+          decodeFromBase64String(base64Area.value);
+        };
+        reader.readAsText(file);
+        return;
+      }
+
+      // Else decode from Base64 textarea
+      const raw = base64Area.value.trim();
+      if (!raw) { alert("Paste Base64 or attach a file containing Base64 text."); return; }
+      decodeFromBase64String(raw);
     }
 
-    function downloadAsText() {
-      const output = document.getElementById("output").value;
-      const blob = new Blob([output], { type: "text/plain;charset=utf-8" });
+    function decodeFromBase64String(raw) {
+      try {
+        const { mime: mimeHint, name: nameHint, base64 } = sniffDataUrl(raw);
+        const bytes = base64ToUint8(base64);
+        const asText = tryDecodeUtf8(bytes);
+
+        // Heuristic: if valid UTF-8 and mostly printable, show it
+        if (asText && isMostlyPrintable(asText)) {
+          decodedArea.value = asText;
+          decodedArea.dataset.binary = "0";
+          decodedArea.dataset.guessName = "";
+        } else {
+          decodedArea.value = `[binary data]\nLength: ${bytes.length} bytes\n\nReady to download as a file.`;
+          decodedArea.dataset.binary = "1";
+          const info = guessFileInfo(bytes, nameHint && nameHint !== "file" ? nameHint : "decoded_file");
+          decodedArea.dataset.mime = mimeHint !== "application/octet-stream" ? mimeHint : info.mime;
+          decodedArea.dataset.guessName = nameHint && nameHint !== "file" ? nameHint : info.name;
+          // stash bytes for download
+          window.__lastDecodedBytes = bytes;
+        }
+      } catch (e) {
+        alert("Invalid Base64 input.");
+      }
+    }
+
+    function isMostlyPrintable(s) {
+      const nonPrintable = (s.match(/[^\x09\x0A\x0D\x20-\x7E]/g) || []).length;
+      return nonPrintable / Math.max(1, s.length) < 0.15;
+    }
+
+    function copySelected() {
+      const target = getSelectedArea();
+      const el = target === "base64" ? base64Area : decodedArea;
+      el.focus(); el.select();
+      const ok = document.execCommand("copy");
+      alert(ok ? "Copied!" : "Copy failed");
+    }
+
+    function downloadSelected() {
+      const target = getSelectedArea();
+
+      if (target === "base64") {
+        const content = base64Area.value;
+        if (!content) { alert("Base64 area is empty."); return; }
+        const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+        triggerDownload(blob, "base64.txt");
+      } else {
+        const content = decodedArea.value;
+        if (!content) { alert("Decoded Text area is empty."); return; }
+
+        if (decodedArea.dataset.binary === "1" && window.__lastDecodedBytes instanceof Uint8Array) {
+          const bytes = window.__lastDecodedBytes;
+          const mime = decodedArea.dataset.mime || guessFileInfo(bytes).mime;
+          const name = (decodedArea.dataset.guessName || guessFileInfo(bytes).name).replace(/[^\w.\-]/g, "_");
+          const blob = new Blob([bytes], { type: mime });
+          triggerDownload(blob, name);
+        } else {
+          const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+          triggerDownload(blob, "decoded.txt");
+        }
+      }
+    }
+
+    function triggerDownload(blob, filename) {
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.download = "base64.txt";
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(link.href), 0);
     }
 
-    function toggleDarkMode() {
-      document.body.classList.toggle("dark");
+    function getSelectedArea() {
+      return document.querySelector('input[name="targetArea"]:checked')?.value || "base64";
     }
-
-    // Auto-detect dark mode from system
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      document.body.classList.add("dark");
-      document.getElementById("darkToggle").checked = true;
-    }
-
-    const dropZone = document.getElementById("dropZone");
-    dropZone.addEventListener("dragover", function (e) {
-      e.preventDefault();
-      dropZone.classList.add("dragover");
-    });
-
-    dropZone.addEventListener("dragleave", function () {
-      dropZone.classList.remove("dragover");
-    });
-
-    dropZone.addEventListener("drop", function (e) {
-      e.preventDefault();
-      dropZone.classList.remove("dragover");
-
-      const files = e.dataTransfer.files;
-      if (files.length) {
-        document.getElementById("fileInput").files = files;
-        convertToBase64();
-      }
-    });
   </script>
 </body>
 </html>
