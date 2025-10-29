@@ -11,8 +11,6 @@
     .container { max-width:980px; margin:auto; background:var(--card-light); border-radius:12px; padding:2rem; box-shadow:0 4px 10px rgba(0,0,0,.1); transition:.3s all; position:relative; }
     body.dark .container { background:var(--card-dark); box-shadow:0 0 10px rgba(255,255,255,.1); }
     h1 { text-align:center; margin-top:0; }
-    .row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
-    @media (max-width:900px){ .row{grid-template-columns:1fr;} }
     .card { display:flex; flex-direction:column; }
     .card label { font-weight:600; margin-bottom:.5rem; }
     textarea { width:100%; min-height:260px; font-family:monospace; font-size:.9rem; padding:1rem; border:1px solid #ccc; border-radius:8px; background:#f9f9f9; color:#333; resize:vertical; }
@@ -30,8 +28,13 @@
     .theme-toggle input { appearance:none; width:40px; height:20px; background:#ccc; border-radius:20px; position:relative; cursor:pointer; }
     .theme-toggle input::before { content:""; width:16px; height:16px; background:#fff; border-radius:50%; position:absolute; top:2px; left:2px; transition:.3s; }
     .theme-toggle input:checked::before { left:22px; }
-    .radio-line { display:flex; align-items:center; gap:1rem; justify-content:center; margin-top:.5rem; flex-wrap:wrap; }
+    .toolbar { display:flex; align-items:center; gap:1rem; flex-wrap:wrap; justify-content:space-between; margin:.5rem 0 1rem; }
+    .seg { display:inline-flex; border:1px solid #ccc; border-radius:10px; overflow:hidden; }
+    .seg button { background:transparent; color:inherit; padding:.5rem .9rem; border:none; }
+    .seg button.active { background:var(--accent); color:#fff; }
+    .options { display:flex; align-items:center; gap:.75rem; font-size:.95rem; }
     .subtle { opacity:.7; font-size:.85rem; }
+    .hidden { display:none !important; }
   </style>
 </head>
 <body>
@@ -43,38 +46,45 @@
 
     <h1>Base64 Encoder / Decoder</h1>
 
-    <div class="row">
-      <div class="card">
-        <label for="base64Area">Base64</label>
-        <textarea id="base64Area" placeholder="Paste Base64 here (optionally data URL: data:...;base64,XXXX)"></textarea>
-        <div class="hint">Use “Convert from Base64” to fill the Decoded Text area.</div>
+    <div class="toolbar">
+      <div class="seg" role="tablist" aria-label="Active area">
+        <button id="tabBase64" class="active" role="tab" aria-selected="true" onclick="setActiveArea('base64')">Base64</button>
+        <button id="tabDecoded" role="tab" aria-selected="false" onclick="setActiveArea('decoded')">Decoded Text</button>
       </div>
-      <div class="card">
-        <label for="decodedArea">Decoded Text</label>
-        <textarea id="decodedArea" placeholder="Decoded text will appear here. You can also type here and click &quot;Convert to Base64&quot;."></textarea>
-        <div class="hint">If you select a file, “Convert to Base64” uses the file instead of this text.</div>
-      </div>
+      <div class="options">
+        <label><input type="checkbox" id="ignoreGarbage"> Ignore garbage in Base64</label>
+        <label><input type="checkbox" id="gzipOutput"> Gzip output</label>
+      </div>    
+    </div>
+
+    <!-- Base64 area -->
+    <div id="paneBase64" class="card">
+      <label for="base64Area">Base64</label>
+      <textarea id="base64Area" placeholder="Paste Base64 here (optionally data URL: data:...;base64,XXXX)"></textarea>
+      <div class="hint">Tip: attach a file that contains Base64 text and click “Convert from Base64”.</div>
+    </div>
+
+    <!-- Decoded area -->
+    <div id="paneDecoded" class="card hidden">
+      <label for="decodedArea">Decoded Text</label>
+      <textarea id="decodedArea" placeholder="Decoded text will appear here. You can also type here and click &quot;Convert to Base64&quot;."></textarea>
+      <div class="hint">If you select a file, “Convert to Base64” uses the file instead of this text.</div>
     </div>
 
     <input type="file" id="fileInput" />
-    <div class="subtle">Tip: to decode from a file that contains Base64 text, attach it and click “Convert from Base64”.</div>
+    <div class="subtle">You can drag & drop a file below. For decoding a Base64 **file**, attach it and click “Convert from Base64”.</div>
     <div id="dropZone">Drag & drop a file here</div>
 
     <div id="controls">
       <button onclick="convertToBase64()">Convert to Base64</button>
       <button onclick="convertFromBase64()">Convert from Base64</button>
-      <button onclick="copySelected()">Copy Selected</button>
-      <button class="download-btn" onclick="downloadSelected()">Download Selected Area</button>
-    </div>
-
-    <div class="radio-line">
-      <span>Selected area:</span>
-      <label><input type="radio" name="targetArea" value="base64" checked> Base64 area</label>
-      <label><input type="radio" name="targetArea" value="decoded"> Decoded Text area</label>
+      <button onclick="copyActive()">Copy Active</button>
+      <button class="download-btn" onclick="downloadActive()">Download Active</button>
     </div>
   </div>
 
   <script>
+
     // ----- Theme -----
     const darkToggle = document.getElementById("darkToggle");
     const preferDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -88,6 +98,41 @@
     const base64Area  = document.getElementById("base64Area");
     const decodedArea = document.getElementById("decodedArea");
     const dropZone    = document.getElementById("dropZone");
+    const ignoreGarbageCk = document.getElementById("ignoreGarbage");
+    const paneBase64  = document.getElementById("paneBase64");
+    const paneDecoded = document.getElementById("paneDecoded");
+    const tabBase64   = document.getElementById("tabBase64");
+    const tabDecoded  = document.getElementById("tabDecoded");
+
+    let activeArea = 'base64'; // 'base64' | 'decoded'
+
+    async function gzipBytes(bytes) {
+      if (!('CompressionStream' in window)) {
+        console.warn('CompressionStream not supported; skipping gzip.');
+        return bytes;
+      }
+
+      // Stream bytes -> gzip -> collect
+      const compressedStream = new Blob([bytes])
+        .stream()
+        .pipeThrough(new CompressionStream('gzip'));
+
+      const ab = await new Response(compressedStream).arrayBuffer();
+      return new Uint8Array(ab);
+    }
+
+
+    function setActiveArea(which) {
+      activeArea = which;
+      const isB = which === 'base64';
+      tabBase64.classList.toggle('active', isB);
+      tabDecoded.classList.toggle('active', !isB);
+      tabBase64.setAttribute('aria-selected', String(isB));
+      tabDecoded.setAttribute('aria-selected', String(!isB));
+      paneBase64.classList.toggle('hidden', !isB);
+      paneDecoded.classList.toggle('hidden', isB);
+      (isB ? base64Area : decodedArea).focus();
+    }
 
     // ----- Drag & Drop -----
     dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("dragover"); });
@@ -109,8 +154,12 @@
     }
 
     function base64Clean(s) {
-      // Accept URL-safe base64, strip whitespace/newlines
-      return s.trim().replace(/[\r\n\s]/g, "").replace(/-/g, "+").replace(/_/g, "/");
+      // If "ignore garbage" is on, remove all non-Base64 chars. Otherwise keep whitespace stripping + URL-safe map.
+      const urlFixed = s.replace(/-/g, "+").replace(/_/g, "/");
+      if (ignoreGarbageCk.checked) {
+        return urlFixed.replace(/[^A-Za-z0-9+/=]/g, "");
+      }
+      return urlFixed.trim().replace(/[\r\n\s]/g, "");
     }
 
     function base64ToUint8(b64) {
@@ -135,126 +184,114 @@
       return { mime: "application/octet-stream", name: "file", base64: v };
     }
 
-    // ---- Magic number MIME/extension sniff ----
+    // ---- Magic number helpers (extended) ----
     function bytesIncludesAscii(bytes, asciiStr) {
-    // Search for an ASCII substring anywhere in the byte array
-    const pat = new TextEncoder().encode(asciiStr);
-    if (pat.length === 0 || bytes.length < pat.length) return false;
-    // naive scan (fast enough for typical files in-browser)
-    outer: for (let i = 0; i <= bytes.length - pat.length; i++) {
-      for (let j = 0; j < pat.length; j++) {
-        if (bytes[i + j] !== pat[j]) continue outer;
-      }
-      return true;
-    }
-    return false;
-  }
-
-  // Replace your existing guessFileInfo with this extended one:
-  function guessFileInfo(bytes, fallbackName = "decoded_file") {
-    const head = bytes.subarray(0, Math.min(bytes.length, 4096));
-    const asStr = (n, off=0)=>String.fromCharCode(...head.subarray(off, off+n));
-    const hex = (...h)=>h.every((v,i)=>head[i]===v);
-
-    // Default
-    let mime = "application/octet-stream";
-    let ext  = "bin";
-
-    // --- Binary signatures (magic numbers) ---
-    if (hex(0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A)) { mime="image/png"; ext="png"; }
-    else if (hex(0xFF,0xD8,0xFF)) { mime="image/jpeg"; ext="jpg"; }
-    else if (asStr(6)==="GIF87a" || asStr(6)==="GIF89a") { mime="image/gif"; ext="gif"; }
-    else if (asStr(4)==="%PDF") { mime="application/pdf"; ext="pdf"; }
-    else if (hex(0x50,0x4B,0x03,0x04) || hex(0x50,0x4B,0x05,0x06) || hex(0x50,0x4B,0x07,0x08)) {
-      // ZIP container (could also be OOXML, APK, JAR, etc.)
-      // Try to identify Office Open XML by scanning for known entries
-      const looksLikeOOXML = bytesIncludesAscii(bytes, "[Content_Types].xml");
-      if (looksLikeOOXML) {
-        if (bytesIncludesAscii(bytes, "word/"))      { mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"; ext="docx"; }
-        else if (bytesIncludesAscii(bytes, "xl/"))   { mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";      ext="xlsx"; }
-        else if (bytesIncludesAscii(bytes, "ppt/"))  { mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"; ext="pptx"; }
-        else { mime="application/zip"; ext="zip"; }
-      } else {
-        mime="application/zip"; ext="zip";
-      }
-    }
-    else if (hex(0x52,0x61,0x72,0x21,0x1A,0x07,0x00)) { mime="application/vnd.rar"; ext="rar"; }
-    else if (hex(0x37,0x7A,0xBC,0xAF,0x27,0x1C)) { mime="application/x-7z-compressed"; ext="7z"; }
-    else if (hex(0x1F,0x8B)) { mime="application/gzip"; ext="gz"; } // gzip
-    else if (hex(0x42,0x5A,0x68)) { mime="application/x-bzip2"; ext="bz2"; } // bzip2
-    else if (hex(0xFD,0x37,0x7A,0x58,0x5A,0x00)) { mime="application/x-xz"; ext="xz"; } // xz
-    else if (asStr(5,257)==="ustar") { mime="application/x-tar"; ext="tar"; } // tar (ustar at offset 257)
-    else if (asStr(4)==="OggS") { mime="application/ogg"; ext="ogg"; }
-    else if (asStr(4)==="RIFF" && asStr(4,8)==="WAVE") { mime="audio/wav"; ext="wav"; }
-    else if (asStr(3)==="ID3" || (head[0]===0xFF && (head[1]&0xE0)===0xE0)) { mime="audio/mpeg"; ext="mp3"; }
-    else if (asStr(4,4)==="ftyp") { mime="video/mp4"; ext="mp4"; } // most mp4/quicktime variants
-    else if (hex(0x1A,0x45,0xDF,0xA3)) { mime="video/webm"; ext="webm"; }
-    else {
-      // --- ASN.1 DER family (very heuristic): X.509 cert/key vs PKCS#12 ---
-      // Many DER files begin with 0x30 0x82 ...
-      // Try to spot PKCS#12 by searching for characteristic attribute names (UTF-16LE often appears)
-      const looksDer = head[0] === 0x30 && head[1] >= 0x80;
-      if (looksDer) {
-        // Check for 'friendlyName' or 'Microsoft CSP' as UTF-16LE markers
-        const fnLE = new TextEncoder().encode("f\0r\0i\0e\0n\0d\0l\0y\0N\0a\0m\0e\0");
-        const msLE = new TextEncoder().encode("M\0i\0c\0r\0o\0s\0o\0f\0t\0");
-        const containsFriendly = bytesIncludesAscii(bytes, "friendlyName") || includesSubarray(bytes, fnLE);
-        const containsMS = bytesIncludesAscii(bytes, "Microsoft") || includesSubarray(bytes, msLE);
-        if (containsFriendly || containsMS) {
-          mime = "application/x-pkcs12"; ext = "p12"; // .pfx also common
-        } else {
-          // Fall back to generic DER (certificate/key/PKCS# structures)
-          mime = "application/x-x509-ca-cert"; ext = "der";
-        }
-      } else {
-        // --- Text heuristics ---
-        const asText = tryDecodeUtf8(bytes);
-        if (asText) {
-          const sample = asText.slice(0, 4096).trim();
-          if (sample.startsWith("-----BEGIN ")) {
-            // PEM containers
-            if (sample.includes("BEGIN CERTIFICATE")) { mime="application/x-pem-file"; ext="pem"; }
-            else if (sample.includes("BEGIN PRIVATE KEY") || sample.includes("BEGIN RSA PRIVATE KEY")) { mime="application/x-pem-file"; ext="pem"; }
-            else if (sample.includes("BEGIN PKCS12")) { mime="application/x-pkcs12"; ext="p12"; }
-            else { mime="application/x-pem-file"; ext="pem"; }
-          } else if (sample.startsWith("{") || sample.startsWith("[")) { mime="application/json"; ext="json"; }
-          else if (sample.startsWith("<?xml")) { mime="application/xml"; ext="xml"; }
-          else {
-            const firstLine = sample.split(/\r?\n/)[0] || "";
-            if (/,/.test(firstLine) && sample.includes("\n")) { mime="text/csv"; ext="csv"; }
-            else { mime="text/plain"; ext="txt"; }
-          }
-        }
-      }
-    }
-
-    const name = `${fallbackName}.${ext}`;
-    return { mime, ext, name };
-
-    // tiny helper to find any byte sequence (used above for UTF-16LE markers)
-    function includesSubarray(hay, needle) {
-      if (!needle || needle.length === 0 || hay.length < needle.length) return false;
-      outer: for (let i = 0; i <= hay.length - needle.length; i++) {
-        for (let j = 0; j < needle.length; j++) {
-          if (hay[i + j] !== needle[j]) continue outer;
-        }
+      const pat = new TextEncoder().encode(asciiStr);
+      if (pat.length === 0 || bytes.length < pat.length) return false;
+      outer: for (let i = 0; i <= bytes.length - pat.length; i++) {
+        for (let j = 0; j < pat.length; j++) { if (bytes[i + j] !== pat[j]) continue outer; }
         return true;
       }
       return false;
     }
-  }
+    function includesSubarray(hay, needle) {
+      if (!needle || needle.length === 0 || hay.length < needle.length) return false;
+      outer: for (let i = 0; i <= hay.length - needle.length; i++) {
+        for (let j = 0; j < needle.length; j++) { if (hay[i + j] !== needle[j]) continue outer; }
+        return true;
+      }
+      return false;
+    }
+
+    function guessFileInfo(bytes, fallbackName = "decoded_file") {
+      const head = bytes.subarray(0, Math.min(bytes.length, 4096));
+      const asStr = (n, off=0)=>String.fromCharCode(...head.subarray(off, off+n));
+      const hex = (...h)=>h.every((v,i)=>head[i]===v);
+
+      let mime = "application/octet-stream", ext = "bin";
+
+      if (hex(0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A)) { mime="image/png"; ext="png"; }
+      else if (hex(0xFF,0xD8,0xFF)) { mime="image/jpeg"; ext="jpg"; }
+      else if (asStr(6)==="GIF87a" || asStr(6)==="GIF89a") { mime="image/gif"; ext="gif"; }
+      else if (asStr(4)==="%PDF") { mime="application/pdf"; ext="pdf"; }
+      else if (hex(0x50,0x4B,0x03,0x04) || hex(0x50,0x4B,0x05,0x06) || hex(0x50,0x4B,0x07,0x08)) {
+        const looksLikeOOXML = bytesIncludesAscii(bytes, "[Content_Types].xml");
+        if (looksLikeOOXML) {
+          if (bytesIncludesAscii(bytes, "word/"))      { mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"; ext="docx"; }
+          else if (bytesIncludesAscii(bytes, "xl/"))   { mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";      ext="xlsx"; }
+          else if (bytesIncludesAscii(bytes, "ppt/"))  { mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"; ext="pptx"; }
+          else { mime="application/zip"; ext="zip"; }
+        } else { mime="application/zip"; ext="zip"; }
+      }
+      else if (hex(0x52,0x61,0x72,0x21,0x1A,0x07,0x00)) { mime="application/vnd.rar"; ext="rar"; }
+      else if (hex(0x37,0x7A,0xBC,0xAF,0x27,0x1C)) { mime="application/x-7z-compressed"; ext="7z"; }
+      else if (hex(0x1F,0x8B)) { mime="application/gzip"; ext="gz"; }
+      else if (hex(0x42,0x5A,0x68)) { mime="application/x-bzip2"; ext="bz2"; }
+      else if (hex(0xFD,0x37,0x7A,0x58,0x5A,0x00)) { mime="application/x-xz"; ext="xz"; }
+      else if (asStr(5,257)==="ustar") { mime="application/x-tar"; ext="tar"; }
+      else if (asStr(4)==="OggS") { mime="application/ogg"; ext="ogg"; }
+      else if (asStr(4)==="RIFF" && asStr(4,8)==="WAVE") { mime="audio/wav"; ext="wav"; }
+      else if (asStr(3)==="ID3" || (head[0]===0xFF && (head[1]&0xE0)===0xE0)) { mime="audio/mpeg"; ext="mp3"; }
+      else if (asStr(4,4)==="ftyp") { mime="video/mp4"; ext="mp4"; }
+      else if (hex(0x1A,0x45,0xDF,0xA3)) { mime="video/webm"; ext="webm"; }
+      else {
+        const looksDer = head[0] === 0x30 && head[1] >= 0x80;
+        if (looksDer) {
+          const fnLE = new TextEncoder().encode("f\0r\0i\0e\0n\0d\0l\0y\0N\0a\0m\0e\0");
+          const msLE = new TextEncoder().encode("M\0i\0c\0r\0o\0s\0o\0f\0t\0");
+          const containsFriendly = bytesIncludesAscii(bytes, "friendlyName") || includesSubarray(bytes, fnLE);
+          const containsMS = bytesIncludesAscii(bytes, "Microsoft") || includesSubarray(bytes, msLE);
+          if (containsFriendly || containsMS) { mime = "application/x-pkcs12"; ext = "p12"; }
+          else { mime = "application/x-x509-ca-cert"; ext = "der"; }
+        } else {
+          const asText = tryDecodeUtf8(bytes);
+          if (asText) {
+            const sample = asText.slice(0, 4096).trim();
+            if (sample.startsWith("-----BEGIN ")) {
+              if (sample.includes("BEGIN CERTIFICATE")) { mime="application/x-pem-file"; ext="pem"; }
+              else if (sample.includes("BEGIN PRIVATE KEY") || sample.includes("BEGIN RSA PRIVATE KEY")) { mime="application/x-pem-file"; ext="pem"; }
+              else if (sample.includes("BEGIN PKCS12")) { mime="application/x-pkcs12"; ext="p12"; }
+              else { mime="application/x-pem-file"; ext="pem"; }
+            } else if (sample.startsWith("{") || sample.startsWith("[")) { mime="application/json"; ext="json"; }
+            else if (sample.startsWith("<?xml")) { mime="application/xml"; ext="xml"; }
+            else {
+              const firstLine = sample.split(/\r?\n/)[0] || "";
+              if (/,/.test(firstLine) && sample.includes("\n")) { mime="text/csv"; ext="csv"; }
+              else { mime="text/plain"; ext="txt"; }
+            }
+          }
+        }
+      }
+
+      const name = `${fallbackName}.${ext}`;
+      return { mime, ext, name };
+    }
 
     // ----- Actions -----
+    const gzipOutputCk = document.getElementById('gzipOutput');
+
     async function convertToBase64() {
       // If a file is chosen -> encode file; else encode text from decodedArea.
       const file = fileInput.files?.[0];
 
+      // When gzip is requested, we must use raw bytes (ArrayBuffer) instead of readAsDataURL.
+      if (file && gzipOutputCk.checked) {
+        const buf   = await file.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        const gz    = await gzipBytes(bytes);
+        base64Area.value = uint8ToBase64(gz); // compressed -> base64
+        setActiveArea('base64');
+        return;
+      }
+
       if (file) {
+        // Original behavior (no gzip): use data URL, strip the "data:...;base64," prefix.
         const reader = new FileReader();
         reader.onload = e => {
           const dataUrl = e.target.result; // data:<mime>;base64,XXXX
           const base64 = String(dataUrl).split(",")[1] || "";
           base64Area.value = base64;
+          setActiveArea('base64');
         };
         reader.readAsDataURL(file);
         return;
@@ -262,9 +299,18 @@
 
       const text = decodedArea.value;
       if (!text) { alert("Type in the Decoded Text area or select a file."); return; }
-      const bytes = new TextEncoder().encode(text);
-      base64Area.value = uint8ToBase64(bytes);
+
+      const plainBytes = new TextEncoder().encode(text);
+
+      if (gzipOutputCk.checked) {
+        const gz = await gzipBytes(plainBytes);
+        base64Area.value = uint8ToBase64(gz);
+      } else {
+        base64Area.value = uint8ToBase64(plainBytes);
+      }
+      setActiveArea('base64');
     }
+
 
     async function convertFromBase64() {
       // If a file is attached, treat it as a Base64 text source:
@@ -272,8 +318,7 @@
       if (file && !base64Area.value.trim()) {
         const reader = new FileReader();
         reader.onload = e => {
-          base64Area.value = String(e.target.result || "").trim();
-          // recurse into decoding after load
+          base64Area.value = String(e.target.result || "");
           decodeFromBase64String(base64Area.value);
         };
         reader.readAsText(file);
@@ -281,8 +326,8 @@
       }
 
       // Else decode from Base64 textarea
-      const raw = base64Area.value.trim();
-      if (!raw) { alert("Paste Base64 or attach a file containing Base64 text."); return; }
+      const raw = base64Area.value;
+      if (!raw.trim()) { alert("Paste Base64 or attach a file containing Base64 text."); return; }
       decodeFromBase64String(raw);
     }
 
@@ -292,7 +337,6 @@
         const bytes = base64ToUint8(base64);
         const asText = tryDecodeUtf8(bytes);
 
-        // Heuristic: if valid UTF-8 and mostly printable, show it
         if (asText && isMostlyPrintable(asText)) {
           decodedArea.value = asText;
           decodedArea.dataset.binary = "0";
@@ -303,9 +347,9 @@
           const info = guessFileInfo(bytes, nameHint && nameHint !== "file" ? nameHint : "decoded_file");
           decodedArea.dataset.mime = mimeHint !== "application/octet-stream" ? mimeHint : info.mime;
           decodedArea.dataset.guessName = nameHint && nameHint !== "file" ? nameHint : info.name;
-          // stash bytes for download
           window.__lastDecodedBytes = bytes;
         }
+        setActiveArea('decoded');
       } catch (e) {
         alert("Invalid Base64 input.");
       }
@@ -316,18 +360,15 @@
       return nonPrintable / Math.max(1, s.length) < 0.15;
     }
 
-    function copySelected() {
-      const target = getSelectedArea();
-      const el = target === "base64" ? base64Area : decodedArea;
+    function copyActive() {
+      const el = activeArea === "base64" ? base64Area : decodedArea;
       el.focus(); el.select();
       const ok = document.execCommand("copy");
       alert(ok ? "Copied!" : "Copy failed");
     }
 
-    function downloadSelected() {
-      const target = getSelectedArea();
-
-      if (target === "base64") {
+    function downloadActive() {
+      if (activeArea === "base64") {
         const content = base64Area.value;
         if (!content) { alert("Base64 area is empty."); return; }
         const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
@@ -338,8 +379,9 @@
 
         if (decodedArea.dataset.binary === "1" && window.__lastDecodedBytes instanceof Uint8Array) {
           const bytes = window.__lastDecodedBytes;
-          const mime = decodedArea.dataset.mime || guessFileInfo(bytes).mime;
-          const name = (decodedArea.dataset.guessName || guessFileInfo(bytes).name).replace(/[^\w.\-]/g, "_");
+          const info = guessFileInfo(bytes);
+          const mime = decodedArea.dataset.mime || info.mime;
+          const name = (decodedArea.dataset.guessName || info.name).replace(/[^\w.\-]/g, "_");
           const blob = new Blob([bytes], { type: mime });
           triggerDownload(blob, name);
         } else {
@@ -357,10 +399,6 @@
       link.click();
       document.body.removeChild(link);
       setTimeout(() => URL.revokeObjectURL(link.href), 0);
-    }
-
-    function getSelectedArea() {
-      return document.querySelector('input[name="targetArea"]:checked')?.value || "base64";
     }
   </script>
 </body>
